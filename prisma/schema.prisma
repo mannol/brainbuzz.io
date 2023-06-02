@@ -1,0 +1,124 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider     = "mysql"
+  url          = env("DATABASE_URL")
+  relationMode = "prisma"
+}
+
+model User {
+  id        String   @id
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cardSets    CardSet[]
+  payments    Payment[]
+  submissions Submission[]
+}
+
+model CardSet {
+  id        String   @id
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  readyAt          DateTime?
+  refundedAt       DateTime?
+  prepareStartedAt DateTime?
+  error            String?    @db.Text
+  title            String     @db.Text
+  createdByUser    User?      @relation(fields: [createdByUserId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  createdByUserId  String?
+  sourceText       String?    @db.LongText
+  textractJobId    String?    @unique
+  requiredTokens   Int        @default(0)
+  questions        Question[]
+  redeemedTokens   Token[]
+
+  @@index([createdByUserId])
+}
+
+model Question {
+  id        String   @id
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  text      String   @db.Text
+  index     Int
+  options   Option[]
+  cardSet   CardSet  @relation(fields: [cardSetId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  cardSetId String
+
+  @@index([cardSetId])
+}
+
+model Option {
+  id         String   @id
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  questionId String
+  text       String   @db.Text
+  isCorrect  Boolean
+  index      Int
+  answers    Answer[]
+
+  @@index([questionId])
+}
+
+model Submission {
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  id      String   @id
+  user    User?    @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  userId  String?
+  answers Answer[]
+
+  @@index([userId])
+}
+
+model Answer {
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  submissionId String
+  option       Option     @relation(fields: [optionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  optionId     String
+
+  @@id([submissionId, optionId])
+  @@index([submissionId])
+  @@index([optionId])
+}
+
+model Token {
+  id        String   @id
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  redeemedAt          DateTime?
+  redeemedByCardSet   CardSet?  @relation(fields: [redeemedByCardSetId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  redeemedByCardSetId String?
+  payment             Payment   @relation(fields: [paymentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  paymentId           String
+
+  @@index([redeemedByCardSetId])
+  @@index([paymentId])
+}
+
+model Payment {
+  id        String   @id
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  amount                  Int
+  isCostlessRefundApplied Boolean   @default(false)
+  reconciliationId        String
+  refundedAt              DateTime?
+  refundedAmount          Int?
+  tokens                  Token[]
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  userId                  String
+
+  @@index([userId])
+}
