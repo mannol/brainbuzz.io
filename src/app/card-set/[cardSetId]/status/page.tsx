@@ -3,9 +3,27 @@ import Steps from './steps'
 import Link from 'next/link'
 import { RiArrowLeftLine } from 'react-icons/ri'
 import getServerSession from '@/app/get-server-session'
+import prisma from '@/lib/prisma'
+import { Metadata } from 'next'
 
 type Props = {
   params: { cardSetId: string }
+}
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const id = params.cardSetId
+
+  const cardSet = await prisma.cardSet.findUnique({ where: { id } })
+
+  if (!cardSet) {
+    return {
+      title: '404 - Not Found',
+    }
+  }
+
+  return {
+    title: 'BrainBuzz - ' + cardSet.title,
+  }
 }
 
 export default async function CardSetStatus(props: Props) {
