@@ -1,6 +1,7 @@
 import './globals.css'
 import clsx from 'clsx'
 import { Inter } from 'next/font/google'
+import { Analytics } from '@vercel/analytics/react'
 import { TrpcProvider } from '@/requests/trpc-provider'
 import { Metadata } from 'next'
 
@@ -24,6 +25,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <p>Copyright © 2023 - All right reserved by Stigma Media, LLC</p>
           </div>
         </footer>
+        <Analytics />
       </body>
     </html>
   )
