@@ -4,6 +4,7 @@ import { Inter } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/react'
 import { TrpcProvider } from '@/requests/trpc-provider'
 import { Metadata } from 'next'
+import Script from 'next/script'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -26,6 +27,18 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           </div>
         </footer>
         <Analytics />
+
+        {/* Google AdWords analytics */}
+        <Script async id="aw" src="https://www.googletagmanager.com/gtag/js?id=AW-11032259157" />
+        <Script async id="aw-tag">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+          
+            gtag('config', 'AW-11032259157');
+          `}
+        </Script>
       </body>
     </html>
   )
