@@ -2,7 +2,6 @@ import { z } from 'zod'
 import { TextractClient, StartDocumentTextDetectionCommand } from '@aws-sdk/client-textract'
 import { GetObjectCommand, HeadObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { nanoid } from 'nanoid'
-import type { UserSession } from '@/app/get-server-session'
 import prisma from '@/lib/prisma'
 import calculateRequiredTokens from '@/lib/calculate-required-tokens'
 import { CardSet, Submission } from '@prisma/client'
@@ -20,11 +19,7 @@ const upstashClient = new Client({
   token: process.env.QSTASH_TOKEN,
 })
 
-async function resolveCardSet(
-  cardSet: CardSet,
-  user: UserSession | null,
-  submission: Submission | null,
-) {
+async function resolveCardSet(cardSet: CardSet, submission: Submission | null) {
   let status: 'READY' | 'ERROR' | 'PREPARING' | 'WAITING' | 'ANALYZING' | 'STARTING'
 
   if (cardSet.readyAt) {
@@ -40,15 +35,6 @@ async function resolveCardSet(
   } else {
     status = 'STARTING'
   }
-
-  const availableTokens = user
-    ? await prisma.token.count({
-        where: {
-          redeemedAt: null,
-          payment: { user: { id: user.uid }, refundedAt: null },
-        },
-      })
-    : 0
 
   const answers = submission
     ? await prisma.answer.findMany({
@@ -77,20 +63,33 @@ async function resolveCardSet(
         })
       : []
 
+  const isLocked = await prisma.token
+    .count({
+      where: { redeemedByCardSet: { id: cardSet.id }, payment: { refundedAt: null } },
+    })
+    .then((count) => count === 0)
+
   return {
     id: cardSet.id,
     status,
     createdAt: cardSet.createdAt,
     title: cardSet.title,
     requiredTokens: cardSet.requiredTokens,
-    canProceed: cardSet.requiredTokens <= availableTokens,
+    isLocked,
     error: cardSet.error,
     submissionId: submission?.id || null,
-    questions: questions.map((question) => {
+    questions: questions.map((question, index) => {
       const answer = answers.find((a) => a.option.questionId === question.id)
+      const hideLocked = index >= 3 && isLocked
+
       return {
-        ...question,
-        options: question.options.map((o) => ({ id: o.id, text: o.text })),
+        id: question.id,
+        text: hideLocked ? '[LOCKED]' : question.text,
+        isLocked: hideLocked,
+        options: question.options.map((o) => ({
+          id: o.id,
+          text: hideLocked ? '[LOCKED]' : o.text,
+        })),
         answer: submission
           ? {
               userChoice: answer ? answer.option.id : null,
@@ -133,7 +132,7 @@ export const cardSetRouter = router({
             })
           : null
 
-      return resolveCardSet(cardSet, user, submission)
+      return resolveCardSet(cardSet, submission)
     }),
   findAll: procedure.query(async (opts) => {
     const user = opts.ctx.user
@@ -159,7 +158,7 @@ export const cardSetRouter = router({
     }
 
     return Promise.all(
-      cardSets.map((cardSet) => resolveCardSet(cardSet, user, cardSet.submission || null)),
+      cardSets.map((cardSet) => resolveCardSet(cardSet, cardSet.submission || null)),
     )
   }),
   create: procedure
@@ -206,7 +205,7 @@ export const cardSetRouter = router({
           },
         })
 
-        return resolveCardSet(cardSet, user, null)
+        return resolveCardSet(cardSet, null)
       } else {
         const getObjectCommand = new GetObjectCommand({
           Bucket: process.env.AWS_UPLOAD_BUCKET,
@@ -235,7 +234,7 @@ export const cardSetRouter = router({
           },
         })
 
-        return resolveCardSet(cardSet, user, null)
+        return resolveCardSet(cardSet, null)
       }
     }),
   recreate: procedure
@@ -271,7 +270,7 @@ export const cardSetRouter = router({
         },
       })
 
-      return resolveCardSet(cardSet, user, null)
+      return resolveCardSet(cardSet, null)
     }),
   prepare: procedure
     .input(
@@ -288,14 +287,13 @@ export const cardSetRouter = router({
         },
       })
 
-      if (!user || !cardSet || (cardSet.createdByUserId && cardSet.createdByUserId !== user?.uid)) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: "You don't have the permissions to prepare this card set",
-        })
-      }
-
-      if (!cardSet.sourceText || cardSet.prepareStartedAt || cardSet.readyAt || cardSet.error) {
+      if (
+        !cardSet ||
+        !cardSet.sourceText ||
+        cardSet.prepareStartedAt ||
+        cardSet.readyAt ||
+        cardSet.error
+      ) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: 'This card set cannot be prepared',
@@ -304,34 +302,32 @@ export const cardSetRouter = router({
 
       return prisma.$transaction(
         async (tx) => {
-          const availableTokens = await tx.token.findMany({
-            select: { id: true },
-            where: {
-              redeemedAt: null,
-              payment: { user: { id: user.uid }, refundedAt: null },
-            },
-            take: cardSet.requiredTokens,
-          })
-
-          if (availableTokens.length < cardSet.requiredTokens) {
-            return {
-              success: false,
-              requiredTokens: cardSet.requiredTokens - availableTokens.length,
-            }
-          }
+          const availableTokens = user
+            ? await tx.token.findMany({
+                select: { id: true },
+                where: {
+                  redeemedAt: null,
+                  payment: { user: { id: user.uid }, refundedAt: null },
+                },
+                take: cardSet.requiredTokens,
+              })
+            : []
 
           await tx.cardSet.update({
             data: {
               prepareStartedAt: new Date(),
-              createdByUser: { connect: { id: user.uid } },
+              createdByUser: user ? { connect: { id: user.uid } } : undefined,
             },
             where: { id: cardSet.id },
           })
 
-          await tx.token.updateMany({
-            data: { redeemedAt: new Date(), redeemedByCardSetId: cardSet.id },
-            where: { id: { in: availableTokens.map((t) => t.id) } },
-          })
+          // Already have tokens, redeem immediatelly
+          if (availableTokens.length >= cardSet.requiredTokens) {
+            await tx.token.updateMany({
+              data: { redeemedAt: new Date(), redeemedByCardSetId: cardSet.id },
+              where: { id: { in: availableTokens.map((t) => t.id) } },
+            })
+          }
 
           const requestUrl = new URL(opts.ctx.requestUrl)
 
@@ -402,6 +398,90 @@ export const cardSetRouter = router({
         },
       })
 
-      return resolveCardSet(cardSet, user, submission)
+      return resolveCardSet(cardSet, submission)
+    }),
+  unlock: procedure
+    .input(
+      z.object({
+        id: z.string(),
+      }),
+    )
+    .mutation(async (opts) => {
+      const user = opts.ctx.user
+
+      const cardSet = await prisma.cardSet.findFirst({
+        where: {
+          id: opts.input.id,
+        },
+        include: {
+          redeemedTokens: {
+            select: {
+              id: true,
+            },
+          },
+        },
+      })
+
+      if (!cardSet || (cardSet.createdByUserId && cardSet.createdByUserId !== user?.uid)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: "You don't have the permissions to unlock this card set",
+        })
+      }
+
+      if (cardSet.redeemedTokens.length === cardSet.requiredTokens) {
+        return {
+          success: true,
+          usedTokens: 0,
+        }
+      }
+
+      if (!user) {
+        return {
+          success: false,
+          requiredTokens: cardSet.requiredTokens,
+        }
+      }
+
+      return prisma.$transaction(
+        async (tx) => {
+          const availableTokens = await tx.token.findMany({
+            select: { id: true },
+            where: {
+              redeemedAt: null,
+              payment: { user: { id: user.uid }, refundedAt: null },
+            },
+            take: cardSet.requiredTokens,
+          })
+
+          if (availableTokens.length < cardSet.requiredTokens) {
+            return {
+              success: false,
+              requiredTokens: cardSet.requiredTokens - availableTokens.length,
+            }
+          }
+
+          await tx.cardSet.update({
+            data: {
+              createdByUser: { connect: { id: user.uid } },
+            },
+            where: { id: cardSet.id },
+          })
+
+          await tx.token.updateMany({
+            data: { redeemedAt: new Date(), redeemedByCardSetId: cardSet.id },
+            where: { id: { in: availableTokens.map((t) => t.id) } },
+          })
+
+          return {
+            success: true,
+            usedTokens: availableTokens.length,
+          }
+        },
+        {
+          maxWait: 4000,
+          timeout: 10000,
+        },
+      )
     }),
 })

@@ -1,27 +1,12 @@
 'use client'
 
-import Modal from '@/components/modal'
-import useBoolean from '@/hooks/use-boolean'
 import { trpc } from '@/requests/trpc'
 import { useClipboard } from '@/hooks/use-clipboard'
 import clsx from 'clsx'
-import { useCallback, useEffect, useState } from 'react'
-import {
-  RiArrowRightLine,
-  RiCheckFill,
-  RiErrorWarningLine,
-  RiExternalLinkFill,
-  RiShareLine,
-} from 'react-icons/ri'
-import { formatMoney } from 'accounting'
+import { useEffect, useState } from 'react'
+import { RiArrowRightLine, RiCheckFill, RiErrorWarningLine, RiShareLine } from 'react-icons/ri'
 import Link from 'next/link'
 import type { UserSession } from '@/app/get-server-session'
-
-if (!process.env.NEXT_PUBLIC_PRICE_ID) {
-  throw new Error('Please provide NEXT_PUBLIC_PRICE_ID env variable')
-}
-
-const priceId = process.env.NEXT_PUBLIC_PRICE_ID
 
 type Props = {
   user: UserSession | null
@@ -65,8 +50,6 @@ export default function Steps(props: Props) {
   url.search = ''
   const clipboard = useClipboard(url.href, 3000)
 
-  const [showPrices, setShowPrices] = useBoolean(false)
-
   const {
     data: cardSet,
     isLoading,
@@ -76,46 +59,17 @@ export default function Steps(props: Props) {
     { refetchInterval: (data) => (data && ['READY', 'ERROR'].includes(data.status) ? 0 : 1000) },
   )
 
-  const {
-    mutateAsync: createCheckoutSession,
-    isLoading: isCreatingCheckoutSession_,
-    data: checkoutSessionData,
-  } = trpc.billing.createCheckoutSession.useMutation()
-
   const { mutateAsync: prepare, status: prepareStatus } = trpc.cardSet.prepare.useMutation()
-
-  const isCreatingCheckoutSession = isCreatingCheckoutSession_ || Boolean(checkoutSessionData)
 
   useEffect(() => {
     if (!cardSet) {
       return
     }
 
-    if (cardSet.status === 'WAITING') {
-      if (!cardSet.canProceed) {
-        setShowPrices.on()
-      } else if (prepareStatus === 'idle') {
-        prepare({ id: cardSet.id })
-      }
+    if (cardSet.status === 'WAITING' && prepareStatus === 'idle') {
+      prepare({ id: cardSet.id })
     }
-  }, [cardSet, setShowPrices, prepare, prepareStatus])
-
-  const purchasingTokens = cardSet ? Math.ceil(cardSet.requiredTokens / 5) * 5 : 0
-
-  const handlePurchaseTokens = useCallback(async () => {
-    const nextUrl = new URL(window.location.href)
-    nextUrl.pathname = '/checkout-callback'
-    nextUrl.search = '?continueTo=' + window.location.href
-
-    const { url } = await createCheckoutSession({
-      price: priceId,
-      quantity: purchasingTokens,
-      cancelUrl: window.location.href,
-      nextUrl: nextUrl.href,
-    })
-
-    window.location.href = url
-  }, [purchasingTokens, createCheckoutSession])
+  }, [cardSet, prepare, prepareStatus])
 
   if (isLoading || error) {
     return <span className="loading loading-lg loading-spinner"></span>
@@ -136,60 +90,6 @@ export default function Steps(props: Props) {
 
   return (
     <>
-      <Modal isOpen={showPrices} onClose={setShowPrices.off} hideOnOutsideClick={false}>
-        <div className="flex flex-col">
-          <p className="text-sm pb-2">
-            To proceed with quiz creation, <span className="font-bold">purchase tokens now</span>.
-            In case you&apos;re unsatisfied, you have a{' '}
-            <span className="font-bold">24-hour window to request an automated refund</span>.
-          </p>
-          <p className="text-sm pb-2">
-            We offer a full refund, excluding any Stripe processing fees. Rest assured, we strive to
-            make the refund process seamless and hassle-free{' '}
-            <span className="font-bold">without any questions asked</span>.
-          </p>
-
-          <div className="flex flex-col bg-base-300 rounded-2xl p-4 mt-4">
-            <div className="flex flex-row justify-between">
-              <div className="flex flex-col">
-                <span className="text-xl font-bold">
-                  {formatMoney(1.99 * (purchasingTokens / 5), 'USD $')}
-                </span>
-                <span className="text-gray-500 text-sm">For {purchasingTokens} tokens</span>
-              </div>
-              <button
-                className="btn btn-primary w-1/2"
-                disabled={isCreatingCheckoutSession}
-                onClick={handlePurchaseTokens}
-              >
-                {isCreatingCheckoutSession ? (
-                  <span className="loading loading-spinner" />
-                ) : (
-                  <>
-                    Get Tokens Now <RiExternalLinkFill className="w-4 h-4" />
-                  </>
-                )}
-              </button>
-            </div>
-            <p className="text-xs text-gray-500 font-medium mt-2 -mb-2 place-self-end rounded-md">
-              * we use Stripe for secure payment processing
-            </p>
-          </div>
-
-          {!user ? (
-            <>
-              <div className="divider" />
-              <p className="text-sm pb-2">
-                Already have an account with purchased tokens? Click here to{' '}
-                <Link className="link" href={'/login?continueTo=' + window.location.href}>
-                  log in
-                </Link>
-                .
-              </p>
-            </>
-          ) : null}
-        </div>
-      </Modal>
       <ul className="steps steps-vertical">
         <Step name="Uploading" state={step > 1 ? 'COMPLETE' : step === 1 ? 'ACTIVE' : 'NONE'} />
         <Step
