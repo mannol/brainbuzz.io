@@ -63,11 +63,12 @@ async function resolveCardSet(cardSet: CardSet, submission: Submission | null) {
         })
       : []
 
-  const isLocked = await prisma.token
-    .count({
-      where: { redeemedByCardSet: { id: cardSet.id }, payment: { refundedAt: null } },
-    })
-    .then((count) => count === 0)
+  const isLocked = false
+  // const isLocked = await prisma.token
+  //   .count({
+  //     where: { redeemedByCardSet: { id: cardSet.id }, payment: { refundedAt: null } },
+  //   })
+  //   .then((count) => count === 0)
 
   return {
     id: cardSet.id,

@@ -70,31 +70,31 @@ const faq = [
       </>
     ),
   },
-  {
-    title: 'Why do we charge for this?',
-    content: (
-      <>
-        <p className="mb-2">
-          You may wonder why a charge is associated with our services. The reason behind this is
-          that training and utilizing ChatGPT and AI technologies, in general, involve significant
-          expenses. By charging for our software, we can ensure that we can maintain and improve the
-          quality of our services while preventing potential abuse.
-        </p>
-        <p className="my-2">
-          However, we have some good news for you. We offer a hassle-free refund policy. If you are
-          unsatisfied with your purchase, you can request an automated refund within 24 hours of
-          purchasing tokens. We provide a full refund, excluding any processing fees imposed by
-          Stripe. Rest assured, no questions will be asked, and we aim to make the refund process as
-          smooth as possible.
-        </p>
-        <p className="mt-2">
-          Your support by purchasing our tokens enables us to continue developing and enhancing our
-          software, making it even more valuable for our users like you. We greatly appreciate your
-          understanding and look forward to providing you with an exceptional learning experience.
-        </p>
-      </>
-    ),
-  },
+  // {
+  //   title: 'Why do we charge for this?',
+  //   content: (
+  //     <>
+  //       <p className="mb-2">
+  //         You may wonder why a charge is associated with our services. The reason behind this is
+  //         that training and utilizing ChatGPT and AI technologies, in general, involve significant
+  //         expenses. By charging for our software, we can ensure that we can maintain and improve the
+  //         quality of our services while preventing potential abuse.
+  //       </p>
+  //       <p className="my-2">
+  //         However, we have some good news for you. We offer a hassle-free refund policy. If you are
+  //         unsatisfied with your purchase, you can request an automated refund within 24 hours of
+  //         purchasing tokens. We provide a full refund, excluding any processing fees imposed by
+  //         Stripe. Rest assured, no questions will be asked, and we aim to make the refund process as
+  //         smooth as possible.
+  //       </p>
+  //       <p className="mt-2">
+  //         Your support by purchasing our tokens enables us to continue developing and enhancing our
+  //         software, making it even more valuable for our users like you. We greatly appreciate your
+  //         understanding and look forward to providing you with an exceptional learning experience.
+  //       </p>
+  //     </>
+  //   ),
+  // },
   {
     title: 'I need some help! What can I do?',
     content: (

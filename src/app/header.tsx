@@ -193,7 +193,7 @@ export default function Header({ tokens: defaultTokens, loggedInUserEmail }: Pro
               <>
                 <button
                   onClick={setShowTokens.on}
-                  className="btn btn-xs btn-outline btn-warning group mr-3"
+                  className="btn btn-xs btn-outline btn-warning group mr-3 hidden"
                 >
                   <RiCoinsFill className="text-lg text-gray-200 group-hover:text-gray-800" />
                   <span className="hidden sm:inline">{tokens} tokens</span>

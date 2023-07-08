@@ -1,4 +1,7 @@
 function calculateRequiredTokens(sourceLength: number) {
+  // make the app free for all
+  return 0
+
   const withoutFirst = Math.max(sourceLength - 6144, 0)
   const remaining = withoutFirst / 5120 + (withoutFirst % 5120 === 0 ? 0 : 1)
 
