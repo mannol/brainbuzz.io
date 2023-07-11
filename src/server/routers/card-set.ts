@@ -83,6 +83,9 @@ async function resolveCardSet(cardSet: CardSet, submission: Submission | null) {
       const answer = answers.find((a) => a.option.questionId === question.id)
       const hideLocked = index >= 3 && isLocked
 
+      // Sometimes AI doesn't return the answer properly
+      const correctChoice = question.options.find((o) => o.isCorrect) || question.options[0]
+
       return {
         id: question.id,
         text: hideLocked ? '[LOCKED]' : question.text,
@@ -94,7 +97,7 @@ async function resolveCardSet(cardSet: CardSet, submission: Submission | null) {
         answer: submission
           ? {
               userChoice: answer ? answer.option.id : null,
-              correctChoice: question.options.find((o) => o.isCorrect)!.id,
+              correctChoice: correctChoice.id,
             }
           : null,
       }

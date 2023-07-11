@@ -52,7 +52,7 @@ const outputSchema = z.object({
         o: z.array(z.string()),
         a: z.number(),
       })
-      .refine((data) => data.a >= 0 || data.a < data.o.length, {
+      .refine((data) => data.a >= 0 && data.a < data.o.length, {
         message: 'Answer index out of bounds',
         path: ['a'],
       }),
@@ -160,7 +160,7 @@ export async function POST(request: NextRequest) {
             markdown, with 3 or 4 items. It must contain the correct answer>
         a: <is a number representing the index of the correct answer in
             the array of options>
-      ]}
+      }]
     }
 
     Learning material: <${tag}>${(input.data.iterator?.incompleteChunk || '') + chunk}</${tag}>
@@ -213,6 +213,7 @@ export async function POST(request: NextRequest) {
 
   if (isError(parsedOrError)) {
     console.error(parsedOrError.message)
+    console.error('Failed to parse:', content)
     return NextResponse.json(
       { title: 'Internal Server Error', message: parsedOrError.message },
       { status: 500 },
@@ -279,6 +280,7 @@ export async function POST(request: NextRequest) {
     }
   } else {
     console.error('Failed to process ChatGPT response: ' + result.error.message)
+    console.error('Response:', parsedOrError)
     return NextResponse.json(
       { title: 'Failed to process ChatGPT response', message: result.error.message },
       { status: 500 },
