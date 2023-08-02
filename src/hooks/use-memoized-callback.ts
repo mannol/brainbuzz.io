@@ -1,7 +1,10 @@
-import { useCallback } from 'react'
+import { useCallback, DependencyList } from 'react'
 import { memoize } from 'lodash'
 
-function useMemoizedCallback(callback: any, deps: React.DependencyList) {
+function useMemoizedCallback<T extends (...args: any[]) => any>(
+  callback: T,
+  deps: DependencyList,
+): T {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   return useCallback(memoize(callback), deps)
 }
