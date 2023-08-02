@@ -7,6 +7,8 @@ import calculateRequiredTokens from '@/lib/calculate-required-tokens'
 import { CardSet, Submission } from '@prisma/client'
 import { TRPCError } from '@trpc/server'
 import { Client } from '@upstash/qstash'
+import { Ratelimit } from '@upstash/ratelimit'
+import { Redis } from '@upstash/redis'
 import { format as formatUrl } from 'url'
 import { extractRawText } from 'mammoth'
 import { procedure, router } from '../trpc'
@@ -17,6 +19,12 @@ if (!process.env.QSTASH_TOKEN) {
 
 const upstashClient = new Client({
   token: process.env.QSTASH_TOKEN,
+})
+
+const ratelimit = new Ratelimit({
+  redis: Redis.fromEnv(),
+  limiter: Ratelimit.slidingWindow(200, '1 h'),
+  analytics: true,
 })
 
 async function resolveCardSet(cardSet: CardSet, submission: Submission | null) {
@@ -184,6 +192,15 @@ export const cardSetRouter = router({
       const headObjectResponse = await s3Client.send(headObjectCommand)
 
       if (headObjectResponse.ContentType === 'application/pdf') {
+        const { success } = await ratelimit.limit('textract-triggers')
+
+        if (!success) {
+          throw new TRPCError({
+            code: 'TOO_MANY_REQUESTS',
+            message: 'We are processing too many requests at the moment. Try again soon.',
+          })
+        }
+
         const textractClient = new TextractClient({})
         const textractCommand = new StartDocumentTextDetectionCommand({
           DocumentLocation: {
