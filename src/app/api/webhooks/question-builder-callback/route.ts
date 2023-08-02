@@ -148,8 +148,8 @@ export async function POST(request: NextRequest) {
         : ''
     }
 
-    Format the output as a minified JSON object with data array that
-    contains the questions as follows:
+    Format the output as a minified RFC8259 compliant JSON response object
+    with data array that contains the questions as follows, no talking:
 
     { 
       ${hasMore ? 'ic: <The last 50 (fifty) words of the learning material>,' : ''}
