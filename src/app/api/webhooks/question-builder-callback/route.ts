@@ -49,7 +49,20 @@ const outputSchema = z.object({
     z
       .object({
         q: z.string(),
-        o: z.array(z.string()),
+        o: z.array(z.string()).or(
+          z.string().transform((str, ctx): string[] => {
+            try {
+              const result = z.array(z.string()).safeParse(JSON.parse(str))
+              if (result.success) {
+                return result.data
+              }
+              throw new Error(result.error.message)
+            } catch (e) {
+              ctx.addIssue({ code: 'custom', message: 'Invalid JSON' })
+              return z.NEVER
+            }
+          }),
+        ),
         a: z.number(),
       })
       .refine((data) => data.a >= 0 && data.a < data.o.length, {
@@ -156,8 +169,7 @@ export async function POST(request: NextRequest) {
       d: [{
         q: <contains the text of the question formatted as a markdown
             with at most 320 characters>
-        o: <array of possible answers, formatted as a string of text using
-            markdown, with 3 or 4 items. It must contain the correct answer>
+        o: <RFC8259 compliant JSON string array of possible answers. It must contain the correct answer>
         a: <is a number representing the index of the correct answer in
             the array of options>
       }]
