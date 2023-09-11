@@ -45,6 +45,7 @@
     "nanoid": "^4.0.2",
     "next": "13.4.4",
     "openai": "^3.2.1",
+    "pdfreader": "^3.0.2",
     "postcss": "8.4.24",
     "postmark": "^3.0.18",
     "prisma": "^4.15.0",

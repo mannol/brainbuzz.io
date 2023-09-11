@@ -11,6 +11,7 @@ import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
 import { format as formatUrl } from 'url'
 import { extractRawText } from 'mammoth'
+import { PdfReader } from 'pdfreader'
 import { procedure, router } from '../trpc'
 
 if (!process.env.QSTASH_TOKEN) {
@@ -191,7 +192,48 @@ export const cardSetRouter = router({
       })
       const headObjectResponse = await s3Client.send(headObjectCommand)
 
-      if (headObjectResponse.ContentType === 'application/pdf') {
+      const getObjectCommand = new GetObjectCommand({
+        Bucket: process.env.AWS_UPLOAD_BUCKET,
+        Key: opts.input.fileKey,
+      })
+      const getObjectResponse = await s3Client.send(getObjectCommand)
+      const arrayBuffer = await getObjectResponse.Body?.transformToByteArray()
+
+      if (!arrayBuffer) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Unexpected return from AWS',
+        })
+      }
+
+      const sourceText =
+        headObjectResponse.ContentType === 'application/pdf'
+          ? await new Promise<string>((resolve, reject) => {
+              let text = ''
+
+              new PdfReader(null).parseBuffer(Buffer.from(arrayBuffer), (err, item) => {
+                if (err) {
+                  reject(err)
+                } else if (!item) {
+                  resolve(text)
+                } else if (item.text) {
+                  text += item.text + '\n'
+                }
+              })
+            })
+          : await extractRawText({ buffer: Buffer.from(arrayBuffer) }).then((res) => res.value)
+
+      if (!sourceText) {
+        // If we can't extract the text from the PDF, try with textract
+        if (headObjectResponse.ContentType !== 'application/pdf') {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: "Couldn't extract text from a Word document",
+          })
+        }
+
+        console.log('Trying to extract PDF text with TEXTRACT')
+
         const { success } = await ratelimit.limit('textract-triggers')
 
         if (!success) {
@@ -228,21 +270,6 @@ export const cardSetRouter = router({
 
         return resolveCardSet(cardSet, null)
       } else {
-        const getObjectCommand = new GetObjectCommand({
-          Bucket: process.env.AWS_UPLOAD_BUCKET,
-          Key: opts.input.fileKey,
-        })
-        const getObjectResponse = await s3Client.send(getObjectCommand)
-        const arrayBuffer = await getObjectResponse.Body?.transformToByteArray()
-
-        if (!arrayBuffer) {
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: 'Unexpected return from AWS',
-          })
-        }
-
-        const { value: sourceText } = await extractRawText({ buffer: Buffer.from(arrayBuffer) })
         const requiredTokens = calculateRequiredTokens(sourceText.length)
 
         const cardSet = await prisma.cardSet.create({
