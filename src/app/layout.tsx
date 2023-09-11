@@ -39,6 +39,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             gtag('config', 'AW-11032259157');
           `}
         </Script>
+        {/* Google AdSense */}
+        <Script
+          async
+          id="g-ad-s"
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9277683455930421"
+          crossOrigin="anonymous"
+        />
       </body>
     </html>
   )
