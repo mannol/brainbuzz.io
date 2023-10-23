@@ -181,6 +181,11 @@ export default function Header({ tokens: defaultTokens, loggedInUserEmail }: Pro
           </div>
         </div>
       </Modal>
+      <div className="alert alert-error p-0 py-2 px-4 rounded-none font-bold flex items-center justify-center">
+        <span className="text-center">
+          BrainBuzz will shutdown on November 1st 2023. Thank you all for using BrainBuzz! :)
+        </span>
+      </div>
       <div className="navbar bg-base-100 flex justify-center px-6">
         <div className="flex flex-1 max-w-2xl flex-col items-start sm:flex-row  sm:items-center">
           <div className="flex-1 -ml-4">
